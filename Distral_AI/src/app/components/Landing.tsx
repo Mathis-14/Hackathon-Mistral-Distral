@@ -52,7 +52,9 @@ const SCENE_TRANSITION_MS = 3690;
 const LANDING_MARK_ASCENT_STEPS = 50;
 const LANDING_MARK_ASCENT_STEP_VH = 0.875;
 const LANDING_MARK_ASCENT_SCALE = 0.42;
-const LANDING_MARK_ASCENT_NUDGE = "clamp(0.12rem, 0.40vw, 0.35rem)";
+const LANDING_MARK_START_TOP = "calc(50% - 5vh)";
+const LANDING_MARK_FINAL_TOP = "clamp(1.25rem, 5svh, 3.5rem)";
+const LANDING_MARK_ENTRY_OFFSET = "-40%";
 const GAME_MODE_PANEL_OFFSET = "clamp(2.9rem, 4.4vw, 3.8rem)";
 const HEADER_DELAY_MS = 280;
 const CARD_ENTRY_DELAY_MS = 520;
@@ -191,19 +193,30 @@ export default function Landing({ onWakeUp }: LandingProps) {
         ))}
       </div>
       <div
-        className="pointer-events-none absolute left-1/2 top-2/5 z-20 will-change-transform"
+        className="pointer-events-none absolute left-1/2 z-20"
         style={{
+          top: showModes ? LANDING_MARK_FINAL_TOP : LANDING_MARK_START_TOP,
           opacity: logoVisible ? 1 : 0,
-          transform: showModes
-            ? `translate(-50%, calc(-${LANDING_MARK_ASCENT_DISTANCE_VH}vh + ${LANDING_MARK_ASCENT_NUDGE})) scale(${LANDING_MARK_ASCENT_SCALE})`
-            : "translate(-50%, -40%) scale(1)",
-          transformOrigin: "center center",
-          transitionDuration: showModes ? `${SCENE_TRANSITION_MS}ms` : "600ms",
-          transitionProperty: "transform, opacity",
-          transitionTimingFunction: showModes ? PIXEL_ASCENT_TIMING_FUNCTION : "ease-out",
+          transform: "translateX(-50%)",
+          transitionDuration: showModes ? `${SCENE_TRANSITION_MS}ms, ${SCENE_TRANSITION_MS}ms` : "600ms, 600ms",
+          transitionProperty: "top, opacity",
+          transitionTimingFunction: showModes
+            ? `${PIXEL_ASCENT_TIMING_FUNCTION}, linear`
+            : "ease-out, ease-out",
         }}
       >
-        <div className="flex w-fit items-end gap-3 mt-[10vh] [--landing-mark-height:clamp(6.25rem,18vw,13.5rem)] sm:gap-4">
+        <div
+          className="flex w-fit items-end gap-3 will-change-transform [--landing-mark-height:clamp(6.25rem,18vw,13.5rem)] sm:gap-4"
+          style={{
+            transform: showModes
+              ? `scale(${LANDING_MARK_ASCENT_SCALE})`
+              : `translateY(${LANDING_MARK_ENTRY_OFFSET}) scale(1)`,
+            transformOrigin: "top center",
+            transitionDuration: showModes ? `${SCENE_TRANSITION_MS}ms` : "600ms",
+            transitionProperty: "transform",
+            transitionTimingFunction: showModes ? PIXEL_ASCENT_TIMING_FUNCTION : "ease-out",
+          }}
+        >
           <Image
             src="/logo_D_test.svg"
             alt="Distral AI logo"
