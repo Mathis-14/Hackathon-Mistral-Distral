@@ -151,6 +151,8 @@ export default function Landing({ onWakeUp }: LandingProps) {
   }, [hasStarted]);
 
   const bottomBandsColors = ["#E10500", "#FB5210", "#F27507", "#F29F05", "#F2CB07"];
+  const isComingSoonMode =
+    selectedMode === "grandma" || selectedMode === "engineering-student";
 
   if (!hasStarted) {
     return (
@@ -339,11 +341,18 @@ export default function Landing({ onWakeUp }: LandingProps) {
           <div className="mt-7 flex min-h-22 items-start justify-center">
             <button
               type="button"
+              disabled={isComingSoonMode}
               onClick={() => {
+                if (isComingSoonMode) {
+                  return;
+                }
+
                 playStartSound();
                 onWakeUp(selectedMode);
               }}
-              className="pixel-card group relative w-full max-w-68 p-1 text-left focus:outline-none focus-visible:outline-2 focus-visible:outline-white/70 sm:max-w-[18rem] sm:p-[5px]"
+              className={`pixel-card group relative w-full max-w-68 p-1 text-left focus:outline-none focus-visible:outline-2 focus-visible:outline-white/70 sm:max-w-[18rem] sm:p-[5px] ${
+                isComingSoonMode ? "cursor-not-allowed" : ""
+              }`}
               style={{
                 opacity: showModes ? 1 : 0,
                 transform: showModes ? "translateY(0)" : `translateY(${GAME_MODE_WAKE_UP_ENTRY_Y})`,
@@ -360,9 +369,9 @@ export default function Landing({ onWakeUp }: LandingProps) {
               <div className="pixel-card__shell relative overflow-hidden bg-(--carbon-black) px-5 py-4 sm:px-6">
                 <div className="relative z-10 flex items-center justify-center gap-4 text-white">
                   <span className="text-2xl font-black uppercase tracking-[0.18em]">
-                    Wake Up
+                    {isComingSoonMode ? "Coming soon" : "Wake Up"}
                   </span>
-                  <WakeUpGlyph />
+                  {!isComingSoonMode ? <WakeUpGlyph /> : null}
                 </div>
               </div>
             </button>
