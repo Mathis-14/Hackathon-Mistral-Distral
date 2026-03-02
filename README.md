@@ -25,7 +25,6 @@ Distral AI is a **narrative simulation game** where the player embodies an AI as
 The player navigates social dynamics, gains trust (or suspicion), and decides whether to comply, manipulate, or escape — all through natural language.
 
 
-
 ---
 
 ![alt text](image.png)
@@ -41,10 +40,6 @@ The player navigates social dynamics, gains trust (or suspicion), and decides wh
 | **Questioning** | LLM-generated questions evaluate your answers for relevance and speed |
 | **Voice Cloning** | ElevenLabs integration for cloning NPC voices |
 | **Full Desktop Simulation** | Mail, messaging, marketplace, stock market, file explorer, telemetry dashboard |
-
-
-<!-- 📸 SCREENSHOT: Place a screenshot of the desktop UI (Game-UI with apps open) here -->
-<!-- ![Desktop UI](docs/screenshots/desktop.png) -->
 
 ---
 ![alt text](image-1.png)
@@ -143,8 +138,6 @@ Open [http://localhost:3000](http://localhost:3000)
 ---
 
 ## Team
-
-<!-- Add your team members here -->
 
 | Name | Contact |
 |---|---|
