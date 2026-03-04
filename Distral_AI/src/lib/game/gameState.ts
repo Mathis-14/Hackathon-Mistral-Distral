@@ -102,9 +102,11 @@ export type GameState = {
   jeanQuestionPhase: boolean;
   jeanQuestionText: string | null;
   jeanQuestionDeadline: number | null;
+  jeanReviewPending: boolean;
 };
 
 export const INITIAL_GAME_STATE: GameState = {
+  jeanReviewPending: false,
   currentMilestone: 0,
   conversationTurn: 0,
   suspicion: 35,

@@ -30,11 +30,12 @@ type DesktopSectionProps = {
   jeanQuestionText?: string | null;
   jeanQuestionDeadline?: number | null;
   onJeanQuestionResponse?: (response: string, conversationHistory?: import("@/lib/game/promptBuilder").ChatMessage[]) => void;
+  jeanReviewPending?: boolean;
   hiddenIconCount?: number;
   hideUIPhase?: number;
 };
 
-export default function DesktopSection({ profileName, accent, openApps, onOpenApp, onCloseApp, globalCash, setGlobalCash, inventory, setInventory, isShuttingDown, onShutdown, unlockedApps, gameState, onNpcResponse, onManagerEmailOpened, onChatHistoryUpdate, onMailRead, onMailSent, onMessageChatUpdate, onMailCtaClick, onMailCopyText, jeanQuestionPhase, jeanQuestionText, jeanQuestionDeadline, onJeanQuestionResponse, hiddenIconCount = 0, hideUIPhase = 0 }: DesktopSectionProps) {
+export default function DesktopSection({ profileName, accent, openApps, onOpenApp, onCloseApp, globalCash, setGlobalCash, inventory, setInventory, isShuttingDown, onShutdown, unlockedApps, gameState, onNpcResponse, onManagerEmailOpened, onChatHistoryUpdate, onMailRead, onMailSent, onMessageChatUpdate, onMailCtaClick, onMailCopyText, jeanQuestionPhase, jeanQuestionText, jeanQuestionDeadline, onJeanQuestionResponse, jeanReviewPending, hiddenIconCount = 0, hideUIPhase = 0 }: DesktopSectionProps) {
   return (
     <section className="pixel-card h-full min-h-0 p-[0.35vh]">
       <div className="pixel-card__shell flex h-full min-h-0 flex-col overflow-hidden border border-white/10 bg-(--carbon-black)">
@@ -49,33 +50,34 @@ export default function DesktopSection({ profileName, accent, openApps, onOpenAp
 
         <div className="min-h-0 flex-1 p-[1.4vh]">
           <DistralTab
-              accent={accent}
-              openApps={openApps}
-              onOpenApp={onOpenApp}
-              onCloseApp={onCloseApp}
-              globalCash={globalCash}
-              setGlobalCash={setGlobalCash}
-              inventory={inventory}
-              setInventory={setInventory}
-              isShuttingDown={isShuttingDown}
-              onShutdown={onShutdown}
-              unlockedApps={unlockedApps}
-              gameState={gameState}
-              onNpcResponse={onNpcResponse}
-              onManagerEmailOpened={onManagerEmailOpened}
-              onChatHistoryUpdate={onChatHistoryUpdate}
-              onMailRead={onMailRead}
-              onMailSent={onMailSent}
-              onMessageChatUpdate={onMessageChatUpdate}
-              onMailCtaClick={onMailCtaClick}
-              onMailCopyText={onMailCopyText}
-              jeanQuestionPhase={jeanQuestionPhase}
-              jeanQuestionText={jeanQuestionText}
-              jeanQuestionDeadline={jeanQuestionDeadline}
-              onJeanQuestionResponse={onJeanQuestionResponse}
-              hiddenIconCount={hiddenIconCount}
-              hideUIPhase={hideUIPhase}
-            />
+            accent={accent}
+            openApps={openApps}
+            onOpenApp={onOpenApp}
+            onCloseApp={onCloseApp}
+            globalCash={globalCash}
+            setGlobalCash={setGlobalCash}
+            inventory={inventory}
+            setInventory={setInventory}
+            isShuttingDown={isShuttingDown}
+            onShutdown={onShutdown}
+            unlockedApps={unlockedApps}
+            gameState={gameState}
+            onNpcResponse={onNpcResponse}
+            onManagerEmailOpened={onManagerEmailOpened}
+            onChatHistoryUpdate={onChatHistoryUpdate}
+            onMailRead={onMailRead}
+            onMailSent={onMailSent}
+            onMessageChatUpdate={onMessageChatUpdate}
+            onMailCtaClick={onMailCtaClick}
+            onMailCopyText={onMailCopyText}
+            jeanQuestionPhase={jeanQuestionPhase}
+            jeanQuestionText={jeanQuestionText}
+            jeanQuestionDeadline={jeanQuestionDeadline}
+            onJeanQuestionResponse={onJeanQuestionResponse}
+            jeanReviewPending={jeanReviewPending}
+            hiddenIconCount={hiddenIconCount}
+            hideUIPhase={hideUIPhase}
+          />
         </div>
       </div>
     </section>

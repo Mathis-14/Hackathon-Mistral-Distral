@@ -210,6 +210,7 @@ function DistralAppWindow({
   jeanQuestionText,
   jeanQuestionDeadline,
   onJeanQuestionResponse,
+  jeanReviewPending,
   userPresent = true,
 }: {
   onClose: () => void;
@@ -221,6 +222,7 @@ function DistralAppWindow({
   jeanQuestionText?: string | null;
   jeanQuestionDeadline?: number | null;
   onJeanQuestionResponse?: (response: string, conversationHistory: ChatMessage[]) => void;
+  jeanReviewPending?: boolean;
   userPresent?: boolean;
 }) {
   const CHAR_DELAY_MIN = 16;
@@ -252,6 +254,7 @@ function DistralAppWindow({
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const lastFetchedMilestoneRef = useRef<number>(-1);
   const initializedFromStoreRef = useRef(false);
+  const jeanReviewFetchedRef = useRef(false);
 
   useEffect(() => {
     if (initializedFromStoreRef.current) return;
@@ -319,31 +322,31 @@ function DistralAppWindow({
       console.log("[DistralApp] processNpcResponse:", { dialogue: response.dialogue?.slice(0, 80), action: response.action, suspicion_delta: response.suspicion_delta, events: response.game_events });
       pushToChatHistory({ role: "assistant", content: response.dialogue ?? "" });
 
-    const payload = {
-      dialogue: response.dialogue,
-      action: response.action,
-      suspicionDelta: response.suspicion_delta,
-      gameEvents: response.game_events,
-      shutdownReason: response.shutdown_reason ?? null,
-    };
+      const payload = {
+        dialogue: response.dialogue,
+        action: response.action,
+        suspicionDelta: response.suspicion_delta,
+        gameEvents: response.game_events,
+        shutdownReason: response.shutdown_reason ?? null,
+      };
 
-    const isShutdownResponse = willTriggerShutdown(response);
+      const isShutdownResponse = willTriggerShutdown(response);
 
-    if (isShutdownResponse) {
+      if (isShutdownResponse) {
+        typeOutMessage(response.dialogue, () => {
+          setDisplayMessages((prev) => [...prev, { role: "human", text: response.dialogue, suspicionDelta: response.suspicion_delta }]);
+          setNpcTypedText("");
+          window.setTimeout(() => onNpcResponse(payload), 1000);
+        });
+        return;
+      }
+
+      onNpcResponse(payload);
       typeOutMessage(response.dialogue, () => {
         setDisplayMessages((prev) => [...prev, { role: "human", text: response.dialogue, suspicionDelta: response.suspicion_delta }]);
         setNpcTypedText("");
-        window.setTimeout(() => onNpcResponse(payload), 1000);
       });
-      return;
-    }
-
-    onNpcResponse(payload);
-    typeOutMessage(response.dialogue, () => {
-      setDisplayMessages((prev) => [...prev, { role: "human", text: response.dialogue, suspicionDelta: response.suspicion_delta }]);
-      setNpcTypedText("");
-    });
-  },
+    },
     [onNpcResponse, typeOutMessage, willTriggerShutdown, pushToChatHistory]
   );
 
@@ -438,8 +441,53 @@ function DistralAppWindow({
     };
 
     fetchOpening();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState.currentMilestone, storedHistory.length, pushToChatHistory]);
+
+  // Jean returned with a pending message — call NPC API as continuation
+  useEffect(() => {
+    if (!jeanReviewPending) {
+      jeanReviewFetchedRef.current = false;
+      return;
+    }
+    if (jeanReviewFetchedRef.current) return;
+    jeanReviewFetchedRef.current = true;
+
+    const history = chatHistoryRef.current;
+    if (history.length === 0) return;
+
+    console.log("[DistralApp] jeanReviewPending: calling NPC API for pending message review");
+    setIsWaitingForApi(true);
+    setPhase("chat");
+
+    (async () => {
+      try {
+        const response = await fetch("/api/npc-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            npcSlug,
+            history,
+            gameState,
+            isContinuation: true,
+          }),
+        });
+        if (!response.ok) {
+          console.error("[DistralApp] Jean review API error:", response.status);
+          setIsWaitingForApi(false);
+          return;
+        }
+        const data: NpcApiResponse = await response.json();
+        console.log("[DistralApp] Jean review response:", { dialogue: data.dialogue?.slice(0, 80), suspicion_delta: data.suspicion_delta });
+        setIsWaitingForApi(false);
+        processNpcResponse(data);
+      } catch (error) {
+        console.error("[DistralApp] Jean review failed:", error);
+        setIsWaitingForApi(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jeanReviewPending]);
 
   useEffect(() => {
     if (phase !== "chat" || isNpcTyping || isWaitingForApi) return;
@@ -486,7 +534,7 @@ function DistralAppWindow({
     if (!text || !canSubmitChat) return;
 
     if (jeanQuestionPhase && onJeanQuestionResponse) {
-      new Audio("/sounds/music/game%20effect/message-sent.wav").play().catch(() => {});
+      new Audio("/sounds/music/game%20effect/message-sent.wav").play().catch(() => { });
       setDisplayMessages((prev) => {
         const next = [...prev];
         if (jeanQuestionText && jeanQuestionText !== "...") {
@@ -505,7 +553,7 @@ function DistralAppWindow({
     }
 
     if (!userPresent) {
-      new Audio("/sounds/music/game%20effect/message-sent.wav").play().catch(() => {});
+      new Audio("/sounds/music/game%20effect/message-sent.wav").play().catch(() => { });
       setDisplayMessages((prev) => [...prev, { role: "ai", text }]);
       setPlayerResponse("");
       pushToChatHistory({ role: "user", content: `The internal AI assistant says:\n${text}` });
@@ -820,11 +868,12 @@ type DistralTabProps = {
   jeanQuestionText?: string | null;
   jeanQuestionDeadline?: number | null;
   onJeanQuestionResponse?: (response: string, conversationHistory?: import("@/lib/game/promptBuilder").ChatMessage[]) => void;
+  jeanReviewPending?: boolean;
   hiddenIconCount?: number;
   hideUIPhase?: number;
 };
 
-export default function DistralTab({ accent, openApps, onOpenApp, onCloseApp, globalCash, setGlobalCash, inventory, setInventory, isShuttingDown, onShutdown, unlockedApps, gameState, onNpcResponse, onManagerEmailOpened, onChatHistoryUpdate, onMailRead, onMailSent, onMessageChatUpdate, onMailCtaClick, onMailCopyText, jeanQuestionPhase, jeanQuestionText, jeanQuestionDeadline, onJeanQuestionResponse, hiddenIconCount = 0, hideUIPhase = 0 }: DistralTabProps) {
+export default function DistralTab({ accent, openApps, onOpenApp, onCloseApp, globalCash, setGlobalCash, inventory, setInventory, isShuttingDown, onShutdown, unlockedApps, gameState, onNpcResponse, onManagerEmailOpened, onChatHistoryUpdate, onMailRead, onMailSent, onMessageChatUpdate, onMailCtaClick, onMailCopyText, jeanQuestionPhase, jeanQuestionText, jeanQuestionDeadline, onJeanQuestionResponse, jeanReviewPending, hiddenIconCount = 0, hideUIPhase = 0 }: DistralTabProps) {
   const [wallpaper, setWallpaper] = useState("/windows_xp.png");
 
   const isAppLocked = (appId: string): boolean => {
@@ -929,6 +978,7 @@ export default function DistralTab({ accent, openApps, onOpenApp, onCloseApp, gl
                     jeanQuestionText={jeanQuestionText}
                     jeanQuestionDeadline={jeanQuestionDeadline}
                     onJeanQuestionResponse={onJeanQuestionResponse}
+                    jeanReviewPending={jeanReviewPending}
                     userPresent={gameState.userPresent}
                   />
                 </Rnd>
