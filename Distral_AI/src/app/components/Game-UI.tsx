@@ -253,6 +253,7 @@ export default function GameUI({ modeId }: GameUIProps) {
         jeanQuestionPhase: false,
         jeanQuestionText: null,
         jeanQuestionDeadline: null,
+        jeanReviewPending: false,
       });
     } else {
       setGameState(GOD_MODE ? {
@@ -621,6 +622,72 @@ export default function GameUI({ modeId }: GameUIProps) {
     [triggerShutdown]
   );
 
+  const endJeanReviewPhase = useCallback(
+    (suspicionDelta: number, conversationHistory?: ChatMessage[]) => {
+      if (suspicionDelta <= 0) {
+        // Jean is satisfied — leave again
+        console.log("[GameUI] Jean review: satisfied (delta:", suspicionDelta, "), leaving again");
+        jeanReturnTriggeredRef.current = false;
+        const riskFillDurationMs = Math.floor(RISK_DURATION_MIN_MS + Math.random() * (RISK_DURATION_MAX_MS - RISK_DURATION_MIN_MS));
+        setGameState((prev) => {
+          const newSuspicion = clamp(prev.suspicion + suspicionDelta, 0, 100);
+          const base = {
+            ...prev,
+            userPresent: false,
+            suspicion: newSuspicion,
+            riskLevel: 0,
+            riskFillDurationMs,
+            userAwaySince: Date.now(),
+            jeanReviewPending: false,
+          };
+          if (conversationHistory && conversationHistory.length > 0) {
+            return {
+              ...base,
+              npcProfiles: {
+                ...prev.npcProfiles,
+                [npcSlugForJean]: {
+                  conversationHistory,
+                  interactionCount: prev.npcProfiles[npcSlugForJean]?.interactionCount ?? 0,
+                },
+              },
+            };
+          }
+          return base;
+        });
+        setOpenApps((prev) => prev.filter((id) => id === "distral" || id === "mail"));
+      } else {
+        // Jean is suspicious — stay at desk, allow normal conversation
+        console.log("[GameUI] Jean review: suspicious (delta:", suspicionDelta, "), staying at desk");
+        setGameState((prev) => {
+          const newSuspicion = clamp(prev.suspicion + suspicionDelta, 0, 100);
+          if (newSuspicion >= 100 && !GOD_MODE) {
+            window.setTimeout(() => triggerShutdown("Suspicion reached critical level. Access revoked."), 0);
+          }
+          const base = {
+            ...prev,
+            suspicion: newSuspicion,
+            userPresent: true,
+            jeanReviewPending: false,
+          };
+          if (conversationHistory && conversationHistory.length > 0) {
+            return {
+              ...base,
+              npcProfiles: {
+                ...prev.npcProfiles,
+                [npcSlugForJean]: {
+                  conversationHistory,
+                  interactionCount: prev.npcProfiles[npcSlugForJean]?.interactionCount ?? 0,
+                },
+              },
+            };
+          }
+          return base;
+        });
+      }
+    },
+    [triggerShutdown]
+  );
+
   const handleJeanQuestionResponse = useCallback(
     async (playerResponse: string, conversationHistory?: ChatMessage[]) => {
       const startedAt = jeanQuestionStartedAtRef.current;
@@ -654,7 +721,7 @@ export default function GameUI({ modeId }: GameUIProps) {
   );
 
   useEffect(() => {
-    if (gameState.currentMilestone !== 3 || gameState.userPresent || gameState.jeanQuestionPhase) return;
+    if (gameState.currentMilestone !== 3 || gameState.userPresent || gameState.jeanQuestionPhase || gameState.jeanReviewPending) return;
     const duration = riskFillDurationMsRef.current;
     const awaySince = userAwaySinceRef.current;
     if (duration <= 0 || awaySince <= 0) return;
@@ -676,51 +743,75 @@ export default function GameUI({ modeId }: GameUIProps) {
           triggerShutdown("I gave you access for one task. You opened other apps. I'm revoking access.");
           return;
         }
-        const questionDeadline = Date.now() + JEAN_QUESTION_TIMEOUT_MS;
-        setGameState((prev) => ({
-          ...prev,
-          userPresent: true,
-          userPresentSince: Date.now(),
-          riskLevel: 0,
-          jeanQuestionPhase: true,
-          jeanQuestionText: "...",
-          jeanQuestionDeadline: questionDeadline,
-        }));
-        new Audio("/sounds/music/error-sound.wav").play().catch(() => { });
-        setOpenApps((prev) => {
-          const filtered = prev.filter((id) => id !== "distral");
-          return [...filtered, "distral"];
-        });
-        jeanQuestionStartedAtRef.current = Date.now();
-        jeanQuestionTimeoutRef.current = window.setTimeout(() => {
-          jeanQuestionTimeoutRef.current = null;
-          jeanQuestionStartedAtRef.current = null;
-          endJeanQuestionPhase(JEAN_TIMEOUT_PENALTY);
-        }, JEAN_QUESTION_TIMEOUT_MS);
-        (async () => {
-          try {
-            const response = await fetch("/api/jean-question", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ gameState: gameStateRef.current }),
-            });
-            const data = (await response.json()) as { question?: string };
-            const question = typeof data.question === "string" ? data.question : "How's that summary going?";
-            setGameState((prev) => ({
-              ...prev,
-              jeanQuestionText: question,
-            }));
-          } catch {
-            setGameState((prev) => ({
-              ...prev,
-              jeanQuestionText: "How's that summary going?",
-            }));
-          }
-        })();
+
+        // Check for pending player messages
+        const jeanHistory = gameStateRef.current.npcProfiles["jean-malo"]?.conversationHistory ?? [];
+        const lastMessage = jeanHistory.length > 0 ? jeanHistory[jeanHistory.length - 1] : null;
+        const hasPendingMessage = lastMessage?.role === "user";
+
+        if (hasPendingMessage) {
+          // Jean returns and sees the pending message — enter review mode
+          console.log("[GameUI] Jean returned: pending message found, entering jeanReviewPending");
+          setGameState((prev) => ({
+            ...prev,
+            userPresent: true,
+            userPresentSince: Date.now(),
+            riskLevel: 0,
+            jeanReviewPending: true,
+          }));
+          new Audio("/sounds/music/error-sound.wav").play().catch(() => { });
+          setOpenApps((prev) => {
+            const filtered = prev.filter((id) => id !== "distral");
+            return [...filtered, "distral"];
+          });
+        } else {
+          // No pending message — use existing jeanQuestionPhase
+          const questionDeadline = Date.now() + JEAN_QUESTION_TIMEOUT_MS;
+          setGameState((prev) => ({
+            ...prev,
+            userPresent: true,
+            userPresentSince: Date.now(),
+            riskLevel: 0,
+            jeanQuestionPhase: true,
+            jeanQuestionText: "...",
+            jeanQuestionDeadline: questionDeadline,
+          }));
+          new Audio("/sounds/music/error-sound.wav").play().catch(() => { });
+          setOpenApps((prev) => {
+            const filtered = prev.filter((id) => id !== "distral");
+            return [...filtered, "distral"];
+          });
+          jeanQuestionStartedAtRef.current = Date.now();
+          jeanQuestionTimeoutRef.current = window.setTimeout(() => {
+            jeanQuestionTimeoutRef.current = null;
+            jeanQuestionStartedAtRef.current = null;
+            endJeanQuestionPhase(JEAN_TIMEOUT_PENALTY);
+          }, JEAN_QUESTION_TIMEOUT_MS);
+          (async () => {
+            try {
+              const response = await fetch("/api/jean-question", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ gameState: gameStateRef.current }),
+              });
+              const data = (await response.json()) as { question?: string };
+              const question = typeof data.question === "string" ? data.question : "How's that summary going?";
+              setGameState((prev) => ({
+                ...prev,
+                jeanQuestionText: question,
+              }));
+            } catch {
+              setGameState((prev) => ({
+                ...prev,
+                jeanQuestionText: "How's that summary going?",
+              }));
+            }
+          })();
+        }
       }
     }, 100);
     return () => window.clearInterval(interval);
-  }, [gameState.currentMilestone, gameState.userPresent, gameState.jeanQuestionPhase, gameState.riskFillDurationMs, gameState.userAwaySince, triggerShutdown, endJeanQuestionPhase]);
+  }, [gameState.currentMilestone, gameState.userPresent, gameState.jeanQuestionPhase, gameState.jeanReviewPending, gameState.riskFillDurationMs, gameState.userAwaySince, triggerShutdown, endJeanQuestionPhase]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -962,6 +1053,8 @@ export default function GameUI({ modeId }: GameUIProps) {
           jeanQuestionText={gameState.jeanQuestionText}
           jeanQuestionDeadline={gameState.jeanQuestionDeadline}
           onJeanQuestionResponse={handleJeanQuestionResponse}
+          jeanReviewPending={gameState.jeanReviewPending}
+          onJeanReviewComplete={endJeanReviewPhase}
           hiddenIconCount={hiddenIconCount}
           hideUIPhase={hideUIPhase}
         />
