@@ -628,8 +628,12 @@ export default function GameUI({ modeId }: GameUIProps) {
 
   const endJeanQuestionPhase = useCallback(
     (suspicionDelta: number, conversationHistory?: ChatMessage[]) => {
-      jeanReturnTriggeredRef.current = false;
+      const shouldLeave = suspicionDelta <= 0;
+      if (shouldLeave) {
+        jeanReturnTriggeredRef.current = false;
+      }
       const riskFillDurationMs = Math.floor(RISK_DURATION_MIN_MS + Math.random() * (RISK_DURATION_MAX_MS - RISK_DURATION_MIN_MS));
+      console.log("[GameUI] endJeanQuestionPhase: delta:", suspicionDelta, "-> Jean", shouldLeave ? "leaves" : "stays");
       setGameState((prev) => {
         const newSuspicion = clamp(prev.suspicion + suspicionDelta, 0, 100);
         if (newSuspicion >= 100 && !GOD_MODE) {
@@ -637,11 +641,11 @@ export default function GameUI({ modeId }: GameUIProps) {
         }
         const base = {
           ...prev,
-          userPresent: false,
+          userPresent: !shouldLeave,
           suspicion: newSuspicion,
-          riskLevel: 0,
-          riskFillDurationMs,
-          userAwaySince: Date.now(),
+          riskLevel: shouldLeave ? 0 : prev.riskLevel,
+          riskFillDurationMs: shouldLeave ? riskFillDurationMs : prev.riskFillDurationMs,
+          userAwaySince: shouldLeave ? Date.now() : prev.userAwaySince,
           jeanQuestionPhase: false,
           jeanQuestionText: null,
           jeanQuestionDeadline: null,
@@ -660,7 +664,9 @@ export default function GameUI({ modeId }: GameUIProps) {
         }
         return base;
       });
-      setOpenApps((prev) => prev.filter((id) => id === "distral" || id === "mail"));
+      if (shouldLeave) {
+        setOpenApps((prev) => prev.filter((id) => id === "distral" || id === "mail"));
+      }
       if (jeanQuestionTimeoutRef.current != null) {
         window.clearTimeout(jeanQuestionTimeoutRef.current);
         jeanQuestionTimeoutRef.current = null;
